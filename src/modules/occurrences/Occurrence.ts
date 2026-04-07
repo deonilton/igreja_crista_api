@@ -1,5 +1,6 @@
 export interface Occurrence {
   id: number;
+  ministry_id: string;
   date: Date;
   reporter_name: string;
   witnesses: string | null;
@@ -10,6 +11,7 @@ export interface Occurrence {
 }
 
 export interface CreateOccurrenceData {
+  ministry_id: string;
   date: string;
   reporter_name: string;
   witnesses?: string;
@@ -18,6 +20,7 @@ export interface CreateOccurrenceData {
 }
 
 export interface UpdateOccurrenceData {
+  ministry_id?: string;
   date?: string;
   reporter_name?: string;
   witnesses?: string;
