@@ -15,11 +15,12 @@ export class OccurrenceService {
 
   async createOccurrence(data: CreateOccurrenceData) {
     const insertQuery = `
-      INSERT INTO occurrences (date, reporter_name, witnesses, location, description)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO occurrences (ministry_id, date, reporter_name, witnesses, location, description)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
+      data.ministry_id,
       data.date,
       data.reporter_name,
       data.witnesses || null,
@@ -42,15 +43,24 @@ export class OccurrenceService {
     }
   }
 
-  async getAllOccurrences(page: number = 1, limit: number = 10) {
+  async getAllOccurrences(page: number = 1, limit: number = 10, ministryId?: string) {
     const { safePage, safeLimit, safeOffset } = sanitizePagination(page, limit);
     
-    const countQuery = 'SELECT COUNT(*) as total FROM occurrences';
-    const dataQuery = `SELECT * FROM occurrences ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+    let countQuery = 'SELECT COUNT(*) as total FROM occurrences';
+    let dataQuery = 'SELECT * FROM occurrences';
+    const queryParams: any[] = [];
+    
+    if (ministryId) {
+      countQuery += ' WHERE ministry_id = ?';
+      dataQuery += ' WHERE ministry_id = ?';
+      queryParams.push(ministryId);
+    }
+    
+    dataQuery += ` ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
     try {
-      const [countResult] = await pool.execute<any[]>(countQuery);
-      const [dataResult] = await pool.query<any[]>(dataQuery);
+      const [countResult] = await pool.execute<any[]>(countQuery, queryParams);
+      const [dataResult] = await pool.query<any[]>(dataQuery, queryParams);
 
       const countRow = countResult[0] as any;
       const total = countRow.total || countRow['COUNT(*)'] || 0;
@@ -89,6 +99,10 @@ export class OccurrenceService {
     const fields = [];
     const values = [];
 
+    if (data.ministry_id !== undefined) {
+      fields.push('ministry_id = ?');
+      values.push(data.ministry_id);
+    }
     if (data.date !== undefined) {
       fields.push('date = ?');
       values.push(data.date);

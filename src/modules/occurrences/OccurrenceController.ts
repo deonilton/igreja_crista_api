@@ -10,16 +10,17 @@ export class OccurrenceController {
 
   async createOccurrence(req: Request, res: Response) {
     try {
-      const { date, reporter_name, witnesses, location, description } = req.body;
+      const { ministry_id, date, reporter_name, witnesses, location, description } = req.body;
 
       // Validação básica
-      if (!date || !reporter_name || !location || !description) {
+      if (!ministry_id || !date || !reporter_name || !location || !description) {
         return res.status(400).json({ 
-          error: 'Campos obrigatórios: date, reporter_name, location, description' 
+          error: 'Campos obrigatórios: ministry_id, date, reporter_name, location, description' 
         });
       }
 
       const occurrence = await this.occurrenceService.createOccurrence({
+        ministry_id,
         date,
         reporter_name,
         witnesses,
@@ -38,8 +39,9 @@ export class OccurrenceController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const ministryId = req.query.ministry_id as string | undefined;
 
-      const result = await this.occurrenceService.getAllOccurrences(page, limit);
+      const result = await this.occurrenceService.getAllOccurrences(page, limit, ministryId);
       res.json(result);
     } catch (error: any) {
       console.error('Erro ao buscar ocorrências:', error);
