@@ -9,6 +9,7 @@ const router = Router();
 router.use(authMiddleware);
 router.use(authorizeResource('membros'));
 
+router.get('/age-ranges', (req, res) => membersController.getAgeRanges(req, res));
 router.get('/', (req, res) => membersController.findAll(req, res));
 router.get('/:id', (req, res) => membersController.findById(req, res));
 router.post('/', (req, res) => membersController.create(req, res));

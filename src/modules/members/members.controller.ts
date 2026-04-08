@@ -86,6 +86,16 @@ export class MembersController {
       res.status(500).json({ error: 'Erro interno do servidor.' });
     }
   }
+
+  async getAgeRanges(req: Request, res: Response): Promise<void> {
+    try {
+      const stats = await membersService.getAgeRanges();
+      res.json(stats);
+    } catch (err) {
+      console.error('Erro ao obter estatísticas por faixa etária:', err);
+      res.status(500).json({ error: 'Erro interno do servidor.' });
+    }
+  }
 }
 
 export default new MembersController();
