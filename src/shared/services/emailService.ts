@@ -46,7 +46,7 @@ class EmailService {
             body {
               font-family: Arial, sans-serif;
               line-height: 1.6;
-              color: #333;
+              color: white;
               max-width: 600px;
               margin: 0 auto;
               padding: 20px;
@@ -67,13 +67,17 @@ class EmailService {
             }
             .button {
               display: inline-block;
-              background: #2563eb;
-              color: white;
+              background: #3b82f6;
+              color: #ffffff !important;
               padding: 12px 30px;
               text-decoration: none;
               border-radius: 5px;
               font-weight: bold;
               margin: 20px 0;
+              font-size: 16px;
+              text-align: center;
+              border: 2px solid #1d4ed8;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             .footer {
               text-align: center;
@@ -91,8 +95,8 @@ class EmailService {
         </head>
         <body>
           <div class="header">
-            <h1>Igreja Cristã Familiar</h1>
-            <p>Sistema de Gestão</p>
+            <h1>Igreja Cristã da Família</h1>
+            <p>Sistema de Gestão Administrativo</p>
           </div>
           
           <div class="content">
@@ -104,7 +108,7 @@ class EmailService {
             
             <p>Para redefinir sua senha, clique no botão abaixo:</p>
             
-            <a href="${resetUrl}" class="button">Redefinir Senha</a>
+            <a href="${resetUrl}" class="button" style="background: #3b82f6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px; display: inline-block; border: 2px solid #1d4ed8;">Redefinir Senha</a>
             
             <p>Ou copie e cole este link no seu navegador:</p>
             <p>${resetUrl}</p>
@@ -115,7 +119,7 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>&copy; 2024 Igreja Cristã Familiar. Todos os direitos reservados.</p>
+            <p>&copy; ${new Date().getFullYear()} Igreja Cristã da Família. Todos os direitos reservados.</p>
             <p>Este é um email automático, por favor não responda.</p>
           </div>
         </body>
@@ -124,7 +128,7 @@ class EmailService {
 
     const emailOptions: EmailOptions = {
       to: email,
-      subject: 'Recuperação de Senha - Igreja Cristã Familiar',
+      subject: 'Recuperação de Senha - Igreja Cristã da Família',
       html: htmlContent
     };
 
@@ -189,8 +193,8 @@ class EmailService {
         </head>
         <body>
           <div class="header">
-            <h1>Igreja Cristã Familiar</h1>
-            <p>Sistema de Gestão</p>
+            <h1>Igreja Cristã da Família</h1>
+            <p>Sistema de Gestão Administrativo</p>
           </div>
           
           <div class="content">
@@ -204,7 +208,7 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>&copy; 2024 Igreja Cristã Familiar. Todos os direitos reservados.</p>
+            <p>&copy; ${new Date().getFullYear()} Igreja Cristã da Família. Todos os direitos reservados.</p>
             <p>Este é um email automático, por favor não responda.</p>
           </div>
         </body>
@@ -222,7 +226,7 @@ class EmailService {
       const result = await resend.emails.send({
         from: fromEmail,
         to: email,
-        subject: 'Senha Alterada - Igreja Cristã Familiar',
+        subject: 'Senha Alterada - Igreja Cristã da Família',
         html: htmlContent
       });
       
