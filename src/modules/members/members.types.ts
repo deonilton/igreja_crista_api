@@ -55,3 +55,11 @@ export interface UpdateMemberRequest {
   status?: string;
   notes?: string;
 }
+
+export interface AgeRangeStats {
+  children: number;
+  teenagers: number;
+  youngAdults: number;
+  adults: number;
+  elderly: number;
+}

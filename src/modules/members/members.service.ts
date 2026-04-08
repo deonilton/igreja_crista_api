@@ -1,6 +1,6 @@
 // Members Service
 import pool from '../../shared/database/connection';
-import { Member, CreateMemberRequest, UpdateMemberRequest } from './members.types';
+import { Member, CreateMemberRequest, UpdateMemberRequest, AgeRangeStats } from './members.types';
 
 function sanitizePagination(page: number, limit: number): { safePage: number; safeLimit: number; safeOffset: number } {
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
@@ -138,6 +138,33 @@ class MembersService {
 
   async delete(id: number): Promise<void> {
     await pool.execute('DELETE FROM members WHERE id = ?', [id]);
+  }
+
+  async getAgeRanges(): Promise<AgeRangeStats> {
+    const query = `
+      SELECT 
+        SUM(CASE WHEN age BETWEEN 0 AND 12 THEN 1 ELSE 0 END) as children,
+        SUM(CASE WHEN age BETWEEN 13 AND 17 THEN 1 ELSE 0 END) as teenagers,
+        SUM(CASE WHEN age BETWEEN 18 AND 29 THEN 1 ELSE 0 END) as youngAdults,
+        SUM(CASE WHEN age BETWEEN 30 AND 59 THEN 1 ELSE 0 END) as adults,
+        SUM(CASE WHEN age >= 60 THEN 1 ELSE 0 END) as elderly
+      FROM (
+        SELECT TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) as age
+        FROM members
+        WHERE birth_date IS NOT NULL
+      ) as ages
+    `;
+
+    const [rows] = await pool.execute<any[]>(query);
+    const result = rows[0];
+
+    return {
+      children: result.children || 0,
+      teenagers: result.teenagers || 0,
+      youngAdults: result.youngAdults || 0,
+      adults: result.adults || 0,
+      elderly: result.elderly || 0,
+    };
   }
 }
 
