@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import pool from '../../shared/database/connection';
-import { LoginRequest, LoginResponse, AuthUser, ForgotPasswordRequest, ResetPasswordRequest } from './auth.types';
+import { LoginRequest, LoginResponse, AuthUser, ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest } from './auth.types';
 import emailService from '../../shared/services/emailService';
 
 class AuthService {
@@ -173,6 +173,54 @@ class AuthService {
 
     // Enviar notificação
     await emailService.sendPasswordChangedNotification(tokenData.email, tokenData.name);
+  }
+
+  async changePassword(userId: number, data: ChangePasswordRequest): Promise<void> {
+    // Validar que as senhas coincidem
+    if (data.newPassword !== data.confirmNewPassword) {
+      throw new Error('A nova senha e a confirmação não coincidem.');
+    }
+
+    // Validar tamanho mínimo da senha
+    if (data.newPassword.length < 6) {
+      throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
+    }
+
+    // Buscar usuário e senha atual
+    const [rows] = await pool.execute<any[]>(
+      `SELECT id, name, email, password FROM users WHERE id = ?`,
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    const user = rows[0];
+
+    // Verificar senha atual
+    const isCurrentPasswordValid = await bcrypt.compare(data.currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new Error('Senha atual incorreta.');
+    }
+
+    // Verificar se nova senha é diferente da atual
+    const isSamePassword = await bcrypt.compare(data.newPassword, user.password);
+    if (isSamePassword) {
+      throw new Error('A nova senha deve ser diferente da senha atual.');
+    }
+
+    // Hash da nova senha
+    const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+
+    // Atualizar senha no banco
+    await pool.execute(
+      `UPDATE users SET password = ? WHERE id = ?`,
+      [hashedPassword, userId]
+    );
+
+    // Enviar notificação de alteração de senha
+    await emailService.sendPasswordChangedNotification(user.email, user.name);
   }
 }
 
