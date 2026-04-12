@@ -7,14 +7,12 @@ let resendInstance: Resend | null = null;
 function getResendInstance(): Resend {
   if (!resendInstance) {
     const apiKey = process.env.RESEND_API_KEY;
-    console.log('🔧 Email Service: Inicializando Resend com API Key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NÃO DEFINIDA');
-    
+
     if (!apiKey) {
       throw new Error('RESEND_API_KEY não está definida no ambiente');
     }
-    
+
     resendInstance = new Resend(apiKey);
-    console.log('✅ Email Service: Resend inicializado com sucesso');
   }
   return resendInstance;
 }
@@ -27,14 +25,8 @@ interface EmailOptions {
 
 class EmailService {
   async sendPasswordResetEmail(email: string, name: string, resetToken: string): Promise<void> {
-    console.log('📧 Email Service: Iniciando envio de password reset');
-    console.log('📧 Email Service: Destinatário:', email);
-    console.log('📧 Email Service: Nome:', name);
-    console.log('📧 Email Service: Token (primeiros 10 chars):', resetToken.substring(0, 10) + '...');
-    
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-    console.log('📧 Email Service: Reset URL gerado:', resetUrl);
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -134,24 +126,19 @@ class EmailService {
 
     try {
       const resend = getResendInstance();
-      console.log('📧 Email Service: Enviando email via Resend...');
-      
+
       // IMPORTANTE: O email 'from' precisa ser um domínio verificado no Resend
       // Para testes, podemos usar 'onboarding@resend.dev' que é o domínio padrão
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-      console.log('📧 Email Service: Usando from:', fromEmail);
-      
-      const result = await resend.emails.send({
+
+      await resend.emails.send({
         from: fromEmail,
         to: emailOptions.to,
         subject: emailOptions.subject,
         html: emailOptions.html
       });
-      
-      console.log('✅ Email Service: Email enviado com sucesso!', result);
-      console.log(`📧 Email Service: Email de recuperação enviado para ${email}`);
     } catch (error) {
-      console.error('❌ Email Service: Erro ao enviar email:', error);
+      console.error('Email Service: erro ao enviar email de recuperação:', error);
       throw new Error('Não foi possível enviar o email de recuperação. Tente novamente mais tarde.');
     }
   }
@@ -217,22 +204,18 @@ class EmailService {
 
     try {
       const resend = getResendInstance();
-      console.log('📧 Email Service: Enviando notificação de senha alterada...');
-      
+
       // IMPORTANTE: O email 'from' precisa ser um domínio verificado no Resend
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-      console.log('📧 Email Service: Usando from:', fromEmail);
-      
-      const result = await resend.emails.send({
+
+      await resend.emails.send({
         from: fromEmail,
         to: email,
         subject: 'Senha Alterada - Igreja Cristã da Família',
         html: htmlContent
       });
-      
-      console.log('✅ Email Service: Notificação de senha alterada enviada!', result);
     } catch (error) {
-      console.error('❌ Email Service: Erro ao enviar notificação:', error);
+      console.error('Email Service: erro ao enviar notificação de senha alterada:', error);
       // Não lança erro aqui pois é apenas uma notificação
     }
   }
