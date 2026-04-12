@@ -164,6 +164,28 @@ class SmallFamiliesController {
     }
   }
 
+  async deleteFullFamily(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID inválido' });
+      }
+
+      await smallFamiliesService.deleteFullFamily(id);
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Erro ao excluir Pequena Família:', error);
+
+      if (error.message === 'Pequena Família não encontrada') {
+        return res.status(404).json({ message: error.message });
+      }
+
+      res.status(500).json({ message: 'Erro ao excluir Pequena Família' });
+    }
+  }
+
   async createFullFamily(req: Request, res: Response) {
     try {
       const data = req.body;
