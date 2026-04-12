@@ -10,5 +10,6 @@ router.use(authMiddleware);
 router.use(authorizeResource('dashboard'));
 
 router.get('/', (req, res) => dashboardController.getDashboard(req, res));
+router.get('/age-ranges', (req, res) => dashboardController.getAgeRanges(req, res));
 
 export default router;

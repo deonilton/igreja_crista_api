@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { isLeaderPortalAccessError } from '../../shared/validators/leaderPortalUserGate';
 import evangelismoService from './evangelismo.service';
 import { CreateEvangelismoLeaderRequest, UpdateEvangelismoLeaderRequest, CreateCasaDePazRequest, CreateEvangelismoReportRequest, UpdateEvangelismoReportRequest } from './evangelismo.types';
 
@@ -53,6 +54,10 @@ class EvangelismoController {
       res.status(201).json(leader);
     } catch (error: any) {
       console.error('Erro ao criar líder de evangelismo:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Membro não encontrado') {
         return res.status(404).json({ message: error.message });
@@ -85,6 +90,10 @@ class EvangelismoController {
       res.json(leader);
     } catch (error: any) {
       console.error('Erro ao atualizar líder de evangelismo:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Líder de evangelismo não encontrado') {
         return res.status(404).json({ message: error.message });

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ministryLeadersService } from './ministry-leaders.service';
 import { CreateMinistryLeaderRequest, UpdateMinistryLeaderRequest } from './ministry-leaders.types';
+import { isLeaderPortalAccessError } from '../../shared/validators/leaderPortalUserGate';
 
 export class MinistryLeadersController {
   // Get all ministries with their leaders
@@ -69,6 +70,10 @@ export class MinistryLeadersController {
       res.status(201).json(leader);
     } catch (error) {
       console.error('Error adding leader:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ error: error.message });
+      }
       
       if (error instanceof Error) {
         if (error.message === 'Member not found') {
@@ -86,12 +91,18 @@ export class MinistryLeadersController {
             error: 'Member is already a leader of this ministry'
           });
         }
-        if (error.message.includes('already has the maximum of 2')) {
+        if (
+          error.message.includes('already has the maximum of 2') ||
+          error.message.includes('máximo de 2')
+        ) {
           return res.status(409).json({
             error: error.message
           });
         }
-        if (error.message.includes('maximum of 4')) {
+        if (
+          error.message.includes('maximum of 4') ||
+          error.message.includes('máximo de 4')
+        ) {
           return res.status(409).json({
             error: error.message
           });
@@ -131,6 +142,10 @@ export class MinistryLeadersController {
       res.json(leader);
     } catch (error) {
       console.error('Error updating leader:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ error: error.message });
+      }
       
       if (error instanceof Error) {
         if (error.message === 'Leader not found') {
@@ -148,7 +163,11 @@ export class MinistryLeadersController {
             error: 'Member is already a leader of this ministry'
           });
         }
-        if (error.message.includes('already has the maximum of 2')) {
+        if (
+          error.message.includes('already has the maximum of 2') ||
+          error.message.includes('máximo de 2') ||
+          error.message.includes('máximo de 4')
+        ) {
           return res.status(409).json({
             error: error.message
           });

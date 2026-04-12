@@ -1,5 +1,6 @@
 // Deacons Service
 import pool from '../../shared/database/connection';
+import { assertMemberHasPortalUserForMinistry } from '../../shared/validators/leaderPortalUserGate';
 import { Deacon, CreateDeaconRequest, UpdateDeaconRequest, MemberSearchResult } from './deacons.types';
 
 function sanitizePagination(page: number, limit: number): { safePage: number; safeLimit: number; safeOffset: number } {
@@ -106,6 +107,8 @@ class DeaconsService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'diaconia');
     
     // Verificar se o membro já é diácono
     const [alreadyDeacon] = await pool.execute<any[]>(
@@ -144,6 +147,8 @@ class DeaconsService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'diaconia');
     
     // Verificar se o membro já é diácono (exceto o próprio)
     const [alreadyDeacon] = await pool.execute<any[]>(

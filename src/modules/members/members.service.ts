@@ -81,7 +81,28 @@ class MembersService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /** Retorna o id do membro que já usa este email (comparação case-insensitive), ou null. */
+  async findIdByEmail(email: string, excludeMemberId?: number): Promise<number | null> {
+    const trimmed = email.trim();
+    if (!trimmed) return null;
+
+    const sql =
+      excludeMemberId != null
+        ? `SELECT id FROM members 
+           WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(?) AND id != ?
+           LIMIT 1`
+        : `SELECT id FROM members 
+           WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(?)
+           LIMIT 1`;
+    const params: (string | number)[] =
+      excludeMemberId != null ? [trimmed, excludeMemberId] : [trimmed];
+
+    const [rows] = await pool.execute<any[]>(sql, params);
+    return rows.length > 0 ? Number(rows[0].id) : null;
+  }
+
   async create(data: CreateMemberRequest): Promise<number> {
+    const email = data.email?.trim() || null;
     const [result] = await pool.execute<any>(
       `INSERT INTO members 
         (full_name, email, phone, birth_date, gender, address, house_number, complement, 
@@ -89,7 +110,7 @@ class MembersService {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.full_name,
-        data.email || null,
+        email,
         data.phone || null,
         data.birth_date || null,
         data.gender || null,
@@ -109,6 +130,7 @@ class MembersService {
   }
 
   async update(id: number, data: UpdateMemberRequest): Promise<void> {
+    const email = data.email?.trim() || null;
     await pool.execute(
       `UPDATE members SET
         full_name = ?, email = ?, phone = ?, birth_date = ?, gender = ?,
@@ -117,7 +139,7 @@ class MembersService {
        WHERE id = ?`,
       [
         data.full_name,
-        data.email || null,
+        email,
         data.phone || null,
         data.birth_date || null,
         data.gender || null,

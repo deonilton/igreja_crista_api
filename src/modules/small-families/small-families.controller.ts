@@ -1,5 +1,6 @@
 // Small Families Controller
 import { Request, Response } from 'express';
+import { isLeaderPortalAccessError } from '../../shared/validators/leaderPortalUserGate';
 import smallFamiliesService from './small-families.service';
 import { CreateSmallFamilyRequest, UpdateSmallFamilyRequest } from './small-families.types';
 
@@ -52,6 +53,10 @@ class SmallFamiliesController {
       res.status(201).json(family);
     } catch (error: any) {
       console.error('Erro ao criar líder de pequena família:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Membro não encontrado') {
         return res.status(404).json({ message: error.message });
@@ -84,6 +89,10 @@ class SmallFamiliesController {
       res.json(family);
     } catch (error: any) {
       console.error('Erro ao atualizar líder de pequena família:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Líder de pequena família não encontrado') {
         return res.status(404).json({ message: error.message });
