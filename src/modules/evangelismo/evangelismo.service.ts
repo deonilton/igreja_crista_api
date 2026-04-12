@@ -1,4 +1,5 @@
 import pool from '../../shared/database/connection';
+import { assertMemberHasPortalUserForMinistry } from '../../shared/validators/leaderPortalUserGate';
 import {
   EvangelismoLeader,
   CreateEvangelismoLeaderRequest,
@@ -113,6 +114,8 @@ class EvangelismoService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'evangelismo');
     
     const [alreadyExists] = await pool.execute<any[]>(
       'SELECT id FROM evangelismo_leaders WHERE member_id = ?',
@@ -148,6 +151,8 @@ class EvangelismoService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'evangelismo');
     
     const [alreadyExists] = await pool.execute<any[]>(
       'SELECT id FROM evangelismo_leaders WHERE member_id = ? AND id != ?',

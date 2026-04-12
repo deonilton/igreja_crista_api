@@ -1,5 +1,6 @@
 // Small Families Service
 import pool from '../../shared/database/connection';
+import { assertMemberHasPortalUserForMinistry } from '../../shared/validators/leaderPortalUserGate';
 import { SmallFamily, CreateSmallFamilyRequest, UpdateSmallFamilyRequest, MemberSearchResult } from './small-families.types';
 
 function sanitizePagination(page: number, limit: number): { safePage: number; safeLimit: number; safeOffset: number } {
@@ -102,6 +103,8 @@ class SmallFamiliesService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'pequenas_familias');
     
     const [alreadyExists] = await pool.execute<any[]>(
       'SELECT id FROM small_families WHERE member_id = ?',
@@ -137,6 +140,8 @@ class SmallFamiliesService {
     if (memberExists.length === 0) {
       throw new Error('Membro não encontrado');
     }
+
+    await assertMemberHasPortalUserForMinistry(data.member_id, 'pequenas_familias');
     
     const [alreadyExists] = await pool.execute<any[]>(
       'SELECT id FROM small_families WHERE member_id = ? AND id != ?',
