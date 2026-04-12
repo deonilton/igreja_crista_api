@@ -447,6 +447,88 @@ class EvangelismoService {
     }
   }
 
+  async updateCasaDePaz(id: number, data: CreateCasaDePazRequest): Promise<void> {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [casaExists] = await connection.execute<any[]>(
+        'SELECT id FROM casas_de_paz WHERE id = ?',
+        [id]
+      );
+
+      if (casaExists.length === 0) {
+        throw new Error('Casa de Paz não encontrada');
+      }
+
+      const [memberExists] = await connection.execute<any[]>(
+        'SELECT id FROM members WHERE id = ?',
+        [data.responsible_id]
+      );
+
+      if (memberExists.length === 0) {
+        throw new Error('Responsável não encontrado');
+      }
+
+      await connection.execute(
+        `UPDATE casas_de_paz SET
+          name = ?, responsible_id = ?, cep = ?, street = ?, number = ?, complement = ?,
+          neighborhood = ?, city = ?, state = ?, host_name = ?, host_age = ?,
+          is_converted = ?, has_bible = ?, meeting_days = ?
+        WHERE id = ?`,
+        [
+          data.name,
+          data.responsible_id,
+          data.cep,
+          data.street || null,
+          data.number,
+          data.complement || null,
+          data.neighborhood || null,
+          data.city || null,
+          data.state || null,
+          data.host_name,
+          data.host_age,
+          data.is_converted || false,
+          data.has_bible || false,
+          JSON.stringify(data.meeting_days || []),
+          id,
+        ]
+      );
+
+      await connection.execute('DELETE FROM casa_de_paz_members WHERE casa_de_paz_id = ?', [id]);
+
+      if (data.family_members && data.family_members.length > 0) {
+        for (const member of data.family_members) {
+          await connection.execute(
+            'INSERT INTO casa_de_paz_members (casa_de_paz_id, name, age) VALUES (?, ?, ?)',
+            [id, member.name, member.age]
+          );
+        }
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async deleteCasaDePaz(id: number): Promise<void> {
+    const [casaExists] = await pool.execute<any[]>(
+      'SELECT id FROM casas_de_paz WHERE id = ?',
+      [id]
+    );
+
+    if (casaExists.length === 0) {
+      throw new Error('Casa de Paz não encontrada');
+    }
+
+    await pool.execute('DELETE FROM casas_de_paz WHERE id = ?', [id]);
+  }
+
   // ===== Relatórios de Evangelismo =====
   
   async findAllReports(page: number = 1, limit: number = 10): Promise<{ reports: EvangelismoReport[], total: number, page: number, totalPages: number }> {

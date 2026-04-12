@@ -25,6 +25,8 @@ router.get('/search-members', (req, res) => evangelismoController.searchMembers(
 router.get('/casas-de-paz', (req, res) => evangelismoController.findAllCasasDePaz(req, res));
 router.get('/casas-de-paz/:id', (req, res) => evangelismoController.findCasaDePazById(req, res));
 router.post('/casas-de-paz', (req, res) => evangelismoController.createCasaDePaz(req, res));
+router.put('/casas-de-paz/:id', (req, res) => evangelismoController.updateCasaDePaz(req, res));
+router.delete('/casas-de-paz/:id', (req, res) => evangelismoController.deleteCasaDePaz(req, res));
 
 // Relatórios de Evangelismo
 router.get('/reports', (req, res) => evangelismoController.findAllReports(req, res));

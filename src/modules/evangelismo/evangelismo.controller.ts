@@ -223,6 +223,81 @@ class EvangelismoController {
     }
   }
 
+  async updateCasaDePaz(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'ID inválido' });
+      }
+
+      const data: CreateCasaDePazRequest = req.body;
+
+      if (!data.name || !data.name.trim()) {
+        return res.status(400).json({ error: 'Nome da Casa de Paz é obrigatório' });
+      }
+
+      if (!data.responsible_id || isNaN(data.responsible_id)) {
+        return res.status(400).json({ error: 'Responsável é obrigatório' });
+      }
+
+      if (!data.cep || !data.cep.trim()) {
+        return res.status(400).json({ error: 'CEP é obrigatório' });
+      }
+
+      if (!data.host_name || !data.host_name.trim()) {
+        return res.status(400).json({ error: 'Nome do anfitrião é obrigatório' });
+      }
+
+      if (!data.host_age || isNaN(data.host_age) || data.host_age <= 0) {
+        return res.status(400).json({ error: 'Idade do anfitrião é obrigatória e deve ser maior que zero' });
+      }
+
+      if (!data.meeting_days || !Array.isArray(data.meeting_days) || data.meeting_days.length === 0) {
+        return res.status(400).json({ error: 'Selecione pelo menos um dia de reunião' });
+      }
+
+      await evangelismoService.updateCasaDePaz(id, data);
+      const casa = await evangelismoService.findCasaDePazById(id);
+
+      res.json(casa);
+    } catch (error: any) {
+      console.error('Erro ao atualizar Casa de Paz:', error);
+
+      if (error.message === 'Casa de Paz não encontrada') {
+        return res.status(404).json({ error: error.message });
+      }
+
+      if (error.message === 'Responsável não encontrado') {
+        return res.status(404).json({ error: error.message });
+      }
+
+      res.status(500).json({ error: 'Erro ao atualizar Casa de Paz' });
+    }
+  }
+
+  async deleteCasaDePaz(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID inválido' });
+      }
+
+      await evangelismoService.deleteCasaDePaz(id);
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Erro ao excluir Casa de Paz:', error);
+
+      if (error.message === 'Casa de Paz não encontrada') {
+        return res.status(404).json({ message: error.message });
+      }
+
+      res.status(500).json({ message: 'Erro ao excluir Casa de Paz' });
+    }
+  }
+
   // ===== Relatórios de Evangelismo =====
   
   async findAllReports(req: Request, res: Response) {
