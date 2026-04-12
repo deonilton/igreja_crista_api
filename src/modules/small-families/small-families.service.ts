@@ -395,6 +395,19 @@ class SmallFamiliesService {
       connection.release();
     }
   }
+
+  async deleteFullFamily(id: number): Promise<void> {
+    const [rows] = await pool.execute<any[]>(
+      'SELECT id FROM small_family_details WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      throw new Error('Pequena Família não encontrada');
+    }
+
+    await pool.execute('DELETE FROM small_family_details WHERE id = ?', [id]);
+  }
 }
 
 export default new SmallFamiliesService();

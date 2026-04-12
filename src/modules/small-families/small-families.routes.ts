@@ -17,6 +17,7 @@ router.get('/:id', (req, res) => smallFamiliesController.findById(req, res));
 router.post('/', (req, res) => smallFamiliesController.create(req, res));
 router.post('/create', (req, res) => smallFamiliesController.createFullFamily(req, res));
 router.put('/:id', (req, res) => smallFamiliesController.update(req, res));
+router.delete('/full-families/:id', (req, res) => smallFamiliesController.deleteFullFamily(req, res));
 router.delete('/:id', (req, res) => smallFamiliesController.delete(req, res));
 
 export default router;
