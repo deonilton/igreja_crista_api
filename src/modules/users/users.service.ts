@@ -1,7 +1,119 @@
 // Users Service - Regras de negócio de usuários
 import bcrypt from 'bcryptjs';
+import type { PoolConnection } from 'mysql2/promise';
 import pool from '../../shared/database/connection';
+import { ministryLeadersService } from '../ministry-leaders/ministry-leaders.service';
 import { User, CreateUserRequest, UpdateUserRequest } from './users.types';
+
+/** Compara nome completo ignorando acentos e caixa (fallback quando e-mail membro ≠ usuário). */
+function normalizeForPersonMatch(value: string | null | undefined): string {
+  if (value == null || String(value).trim() === '') return '';
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/** Ministérios que exibem o card de líderes no painel (mesmo conjunto usado no front). */
+const MINISTRIES_WITH_LEADERSHIP_CARD = new Set([
+  'pequenas_familias',
+  'evangelismo',
+  'diaconia',
+  'louvor',
+  'ministerio_infantil',
+  'membros',
+]);
+
+async function resolveMemberIdFromUserProfile(
+  executor: PoolConnection | typeof pool,
+  email: string | null | undefined,
+  name: string | null | undefined
+): Promise<number | null> {
+  const emailNorm =
+    email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
+  if (emailNorm) {
+    const [rows] = await executor.execute<any[]>(
+      'SELECT id FROM members WHERE email IS NOT NULL AND LOWER(TRIM(email)) = ? LIMIT 1',
+      [emailNorm]
+    );
+    if (rows.length > 0) return rows[0].id;
+  }
+  const userNameNorm = normalizeForPersonMatch(name);
+  if (userNameNorm === '') return null;
+  const [members] = await executor.execute<any[]>(
+    'SELECT id, full_name FROM members WHERE full_name IS NOT NULL'
+  );
+  const matches = (members as { id: number; full_name: string }[]).filter(
+    (m) => normalizeForPersonMatch(m.full_name) === userNameNorm
+  );
+  if (matches.length === 1) return matches[0].id;
+  return null;
+}
+
+/**
+ * Alinha `ministry_leaders` com o acesso do painel: quem tem ministério em `user_ministries`
+ * e membro correspondente aparece como líder no card do ministério (como em /pequenas-familias).
+ */
+async function syncMinistryLeadersWithUserAccess(
+  params: {
+    email: string;
+    name: string;
+    role: string;
+    ministrySlugs: string[];
+  },
+  mode: 'create' | 'update'
+): Promise<void> {
+  if (params.role === 'super_admin') {
+    if (mode === 'update') {
+      const memberId = await resolveMemberIdFromUserProfile(pool, params.email, params.name);
+      if (memberId != null) {
+        await pool.execute('DELETE FROM ministry_leaders WHERE member_id = ?', [memberId]);
+      }
+    }
+    return;
+  }
+
+  const slugs = [...new Set(params.ministrySlugs)].filter((s) =>
+    MINISTRIES_WITH_LEADERSHIP_CARD.has(s)
+  );
+
+  const memberId = await resolveMemberIdFromUserProfile(pool, params.email, params.name);
+  if (memberId == null) return;
+
+  if (mode === 'update') {
+    if (slugs.length === 0) {
+      await pool.execute('DELETE FROM ministry_leaders WHERE member_id = ?', [memberId]);
+    } else {
+      const placeholders = slugs.map(() => '?').join(',');
+      await pool.execute(
+        `DELETE FROM ministry_leaders WHERE member_id = ? AND ministry_id NOT IN (${placeholders})`,
+        [memberId, ...slugs]
+      );
+    }
+  }
+
+  if (slugs.length === 0) return;
+
+  for (const slug of slugs) {
+    const [existing] = await pool.execute<any[]>(
+      'SELECT id FROM ministry_leaders WHERE member_id = ? AND ministry_id = ? LIMIT 1',
+      [memberId, slug]
+    );
+    if (existing.length > 0) continue;
+
+    try {
+      await ministryLeadersService.addLeader({
+        ministry_id: slug,
+        member_id: memberId,
+        role: 'leader',
+      });
+    } catch (e) {
+      console.warn(`[users] Não foi possível sincronizar líder do ministério "${slug}":`, e);
+    }
+  }
+}
 
 class UsersService {
   async findAll(): Promise<User[]> {
@@ -91,6 +203,16 @@ class UsersService {
       }
     }
 
+    await syncMinistryLeadersWithUserAccess(
+      {
+        email: data.email,
+        name: data.name,
+        role: data.role || 'colaborador',
+        ministrySlugs: data.ministries ?? [],
+      },
+      'create'
+    );
+
     return userId;
   }
 
@@ -159,6 +281,16 @@ class UsersService {
         }
       }
     }
+
+    await syncMinistryLeadersWithUserAccess(
+      {
+        email: data.email,
+        name: data.name,
+        role: data.role || 'colaborador',
+        ministrySlugs: data.ministries ?? [],
+      },
+      'update'
+    );
   }
 
   async delete(id: number, currentUserId: number): Promise<void> {
@@ -167,7 +299,7 @@ class UsersService {
     }
 
     const [existing] = await pool.execute<any[]>(
-      'SELECT id FROM users WHERE id = ?',
+      'SELECT id, email, name FROM users WHERE id = ?',
       [id]
     );
 
@@ -175,7 +307,65 @@ class UsersService {
       throw new Error('Usuário não encontrado.');
     }
 
-    await pool.execute('DELETE FROM users WHERE id = ?', [id]);
+    const row = existing[0];
+    const emailRaw = row.email as string | null | undefined;
+    const emailNorm =
+      emailRaw && String(emailRaw).trim() !== ''
+        ? String(emailRaw).trim().toLowerCase()
+        : null;
+    const userNameNorm = normalizeForPersonMatch(row.name as string | null | undefined);
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      let memberIdToClean: number | null = null;
+
+      if (emailNorm) {
+        const [memberRows] = await connection.execute<any[]>(
+          'SELECT id FROM members WHERE email IS NOT NULL AND LOWER(TRIM(email)) = ? LIMIT 1',
+          [emailNorm]
+        );
+        if (memberRows.length > 0) {
+          memberIdToClean = memberRows[0].id;
+        }
+      }
+
+      if (memberIdToClean == null && userNameNorm !== '') {
+        const [leaderMembers] = await connection.execute<any[]>(
+          `SELECT DISTINCT m.id, m.full_name
+           FROM members m
+           WHERE m.id IN (
+             SELECT member_id FROM ministry_leaders
+             UNION
+             SELECT member_id FROM evangelismo_leaders
+           )`
+        );
+        const nameMatches = leaderMembers.filter(
+          (m) => normalizeForPersonMatch(m.full_name) === userNameNorm
+        );
+        if (nameMatches.length === 1) {
+          memberIdToClean = nameMatches[0].id;
+        }
+      }
+
+      if (memberIdToClean != null) {
+        await connection.execute('DELETE FROM ministry_leaders WHERE member_id = ?', [
+          memberIdToClean,
+        ]);
+        await connection.execute('DELETE FROM evangelismo_leaders WHERE member_id = ?', [
+          memberIdToClean,
+        ]);
+      }
+
+      await connection.execute('DELETE FROM users WHERE id = ?', [id]);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 }
 

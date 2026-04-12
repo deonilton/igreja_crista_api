@@ -1,5 +1,6 @@
 // Small Families Controller
 import { Request, Response } from 'express';
+import { isLeaderPortalAccessError } from '../../shared/validators/leaderPortalUserGate';
 import smallFamiliesService from './small-families.service';
 import { CreateSmallFamilyRequest, UpdateSmallFamilyRequest } from './small-families.types';
 
@@ -52,6 +53,10 @@ class SmallFamiliesController {
       res.status(201).json(family);
     } catch (error: any) {
       console.error('Erro ao criar líder de pequena família:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Membro não encontrado') {
         return res.status(404).json({ message: error.message });
@@ -84,6 +89,10 @@ class SmallFamiliesController {
       res.json(family);
     } catch (error: any) {
       console.error('Erro ao atualizar líder de pequena família:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Líder de pequena família não encontrado') {
         return res.status(404).json({ message: error.message });
@@ -152,6 +161,28 @@ class SmallFamiliesController {
     } catch (error) {
       console.error('Erro ao buscar Pequenas Famílias:', error);
       res.status(500).json({ error: 'Erro ao buscar Pequenas Famílias' });
+    }
+  }
+
+  async deleteFullFamily(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'ID inválido' });
+      }
+
+      await smallFamiliesService.deleteFullFamily(id);
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Erro ao excluir Pequena Família:', error);
+
+      if (error.message === 'Pequena Família não encontrada') {
+        return res.status(404).json({ message: error.message });
+      }
+
+      res.status(500).json({ message: 'Erro ao excluir Pequena Família' });
     }
   }
 

@@ -1,5 +1,6 @@
 // Deacons Controller
 import { Request, Response } from 'express';
+import { isLeaderPortalAccessError } from '../../shared/validators/leaderPortalUserGate';
 import deaconsService from './deacons.service';
 import { CreateDeaconRequest, UpdateDeaconRequest } from './deacons.types';
 
@@ -53,6 +54,10 @@ class DeaconsController {
       res.status(201).json(deacon);
     } catch (error: any) {
       console.error('Erro ao criar diácono:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Membro não encontrado') {
         return res.status(404).json({ message: error.message });
@@ -85,6 +90,10 @@ class DeaconsController {
       res.json(deacon);
     } catch (error: any) {
       console.error('Erro ao atualizar diácono:', error);
+
+      if (isLeaderPortalAccessError(error)) {
+        return res.status(400).json({ message: error.message });
+      }
       
       if (error.message === 'Diácono não encontrado') {
         return res.status(404).json({ message: error.message });
