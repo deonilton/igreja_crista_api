@@ -4,6 +4,10 @@ import { Resend } from 'resend';
 // Inicialização lazy para evitar erro durante startup
 let resendInstance: Resend | null = null;
 
+function getFrontendBaseUrl(): string {
+  return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+}
+
 function getResendInstance(): Resend {
   if (!resendInstance) {
     const apiKey = process.env.RESEND_API_KEY;
@@ -25,7 +29,7 @@ interface EmailOptions {
 
 class EmailService {
   async sendPasswordResetEmail(email: string, name: string, resetToken: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getFrontendBaseUrl()}/reset-password?token=${resetToken}`;
 
     const htmlContent = `
       <!DOCTYPE html>
