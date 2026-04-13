@@ -22,6 +22,7 @@ import { aconselhamentosRoutes } from './modules/aconselamentos';
 import { pastoralRoomRoutes } from './modules/pastoral-room';
 import ministryLeadersRoutes from './modules/ministry-leaders/ministry-leaders.routes';
 import cepRoutes from './routes/cep';
+import bibleRoutes from './modules/bible/bible.routes';
 import seedAdmin from './seed';
 
 const app = express();
@@ -80,6 +81,7 @@ app.use('/api/occurrences', occurrencesRoutes);
 app.use('/api/cult-reports', cultReportsRoutes);
 app.use('/api/aconselhamentos', aconselhamentosRoutes);
 app.use('/api/pastoral-room', pastoralRoomRoutes);
+app.use('/api/bible', bibleRoutes);
 app.use('/api/cep', cepRoutes);
 
 // Health check
