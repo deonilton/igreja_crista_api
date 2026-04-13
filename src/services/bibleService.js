@@ -19,6 +19,8 @@ const FALLBACK_BIBLE_API = 'https://bible-api.com';
 
 /** Timeout por tentativa à SuperSearch (evita esperar 25s+ antes do fallback). */
 const SUPERSEARCH_TIMEOUT_MS = 10000;
+/** /statics só enriquece nomes dos livros; não deve bloquear passagens (usa mapa local na hora). */
+const SUPERSEARCH_STATICS_TIMEOUT_MS = 4000;
 /** Capítulo inteiro costuma ser payload maior / mais lento — margem extra antes do fallback. */
 const SUPERSEARCH_CHAPTER_TIMEOUT_MS = 18000;
 const FALLBACK_HTTP_TIMEOUT_MS = 20000;
@@ -534,7 +536,8 @@ const VOTD_REFERENCES = [
 ];
 
 let verseOfTheDayCache = { dateKey: null, payload: null };
-let staticsPromise = null;
+/** @type {boolean} */
+let staticsBackgroundFetchStarted = false;
 /** @type {Map<string, { name: string, shortname: string }>|null} */
 let booksById = null;
 
@@ -638,37 +641,42 @@ function resolveBibleModule(version) {
 }
 
 /**
- * Carrega metadados dos livros (uma vez) para mapear book:number → nome.
- * Se /statics falhar (timeout, etc.), usa lista local de 66 livros para não bloquear buscas/passagens.
+ * Garante mapa id→nome dos livros para normalizar respostas da SuperSearch.
+ * Usa imediatamente o mapa local de 66 livros (sem esperar rede) e tenta /statics uma vez em segundo plano
+ * para nomes oficiais da API — evita atrasar capítulos/buscas quando /statics está lento ou bloqueado.
  */
 async function ensureBooksIndex() {
-  if (booksById) return;
-  if (!staticsPromise) {
-    staticsPromise = (async () => {
-      try {
-        const { data } = await axiosWithRetry(() =>
+  if (!booksById) {
+    booksById = buildFallbackBooksMapFromStatic();
+  }
+  if (staticsBackgroundFetchStarted) {
+    return;
+  }
+  staticsBackgroundFetchStarted = true;
+  (async () => {
+    try {
+      const { data } = await axiosWithRetry(
+        () =>
           axios.get(`${SUPERSEARCH_API}/statics`, {
-            timeout: SUPERSEARCH_TIMEOUT_MS,
+            timeout: SUPERSEARCH_STATICS_TIMEOUT_MS,
             headers: { Accept: 'application/json', 'User-Agent': 'IgrejaCrista-Pastoral/1.0' },
             validateStatus: (s) => s < 500,
-          })
-        );
-        const list = data?.results?.books;
-        if (!Array.isArray(list)) {
-          throw new Error('Statics inválidos: falta results.books');
-        }
-        const map = new Map();
-        for (const b of list) {
-          map.set(String(b.id), { name: b.name, shortname: b.shortname || b.name });
-        }
-        booksById = map;
-      } catch (e) {
-        logFailure('ensureBooksIndex /statics indisponível — usando mapa local de livros', e);
-        booksById = buildFallbackBooksMapFromStatic();
+          }),
+        { attempts: 1 }
+      );
+      const list = data?.results?.books;
+      if (!Array.isArray(list)) {
+        throw new Error('Statics inválidos: falta results.books');
       }
-    })();
-  }
-  await staticsPromise;
+      const map = new Map();
+      for (const b of list) {
+        map.set(String(b.id), { name: b.name, shortname: b.shortname || b.name });
+      }
+      booksById = map;
+    } catch (e) {
+      logFailure('ensureBooksIndex /statics indisponível — mantendo mapa local de livros', e);
+    }
+  })();
 }
 
 /**
@@ -988,10 +996,30 @@ async function searchVerses(keyword, version = 'nvi') {
   }
 }
 
+/** Contagem de versículos por capítulo (numeração protestante usual). Índice 0 = capítulo 1. */
+const VERSE_COUNTS_BY_BOOK = require('../data/bibleChapterVerseCounts.json');
+
+/**
+ * @param {string} bookAbbrev - ex.: gn, 1sm, jo, jó
+ * @returns {number[] | null}
+ */
+function getVerseCountsByChapterArray(bookAbbrev) {
+  const raw = String(bookAbbrev || '')
+    .trim()
+    .toLowerCase();
+  let key = raw;
+  if (!VERSE_COUNTS_BY_BOOK[key] && raw === 'nb') {
+    key = 'nm';
+  }
+  const arr = VERSE_COUNTS_BY_BOOK[key];
+  return Array.isArray(arr) ? arr : null;
+}
+
 module.exports = {
   getVerseOfTheDay,
   getVerseByReference,
   getVersesByChapter,
   searchVerses,
   getBooksCatalog,
+  getVerseCountsByChapterArray,
 };
