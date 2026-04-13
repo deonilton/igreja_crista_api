@@ -19,8 +19,8 @@ const FALLBACK_BIBLE_API = 'https://bible-api.com';
 
 /** Timeout por tentativa à SuperSearch (evita esperar 25s+ antes do fallback). */
 const SUPERSEARCH_TIMEOUT_MS = 10000;
-/** /statics só enriquece nomes dos livros; não deve bloquear passagens (usa mapa local na hora). */
-const SUPERSEARCH_STATICS_TIMEOUT_MS = 4000;
+/** /statics só enriquece nomes dos livros (fundo); timeout curto — mapa local já cobre o fluxo. */
+const SUPERSEARCH_STATICS_TIMEOUT_MS = 2500;
 /** Capítulo inteiro costuma ser payload maior / mais lento — margem extra antes do fallback. */
 const SUPERSEARCH_CHAPTER_TIMEOUT_MS = 18000;
 const FALLBACK_HTTP_TIMEOUT_MS = 20000;
@@ -407,6 +407,13 @@ const CHAPTERS_BY_ABBREV = {
 
 const CANON_ABBREVS_IN_ORDER = [...OT_ABBREV_ORDER, ...NT_ABBREV_ORDER];
 
+/** id numérico do livro na SuperSearch (1..66, ordem protestante) → nome em português para a UI. */
+const BOOK_ID_TO_PT_DISPLAY = {};
+CANON_ABBREVS_IN_ORDER.forEach((abbrev, i) => {
+  const nm = PT_ABBREV_TO_BOOK_NAME[abbrev];
+  if (nm) BOOK_ID_TO_PT_DISPLAY[String(i + 1)] = nm;
+});
+
 function getMaxChaptersForBookKey(book) {
   if (book === null || book === undefined) return null;
   const s = String(book).trim();
@@ -514,6 +521,19 @@ const PT_ABBREV_TO_USFM = {
   jd: 'JUD',
   ap: 'REV',
 };
+
+/** USFM (ex.: PSA, PRO) → abreviação PT usada nas rotas (`sl`, `pv`). */
+const USFM_TO_PT_ABBREV = {};
+for (const [ptAb, usfm] of Object.entries(PT_ABBREV_TO_USFM)) {
+  USFM_TO_PT_ABBREV[String(usfm).toUpperCase()] = ptAb;
+}
+
+function bookDisplayNamePtFromUsfmId(bookIdRaw) {
+  if (bookIdRaw == null || bookIdRaw === '') return null;
+  const k = String(bookIdRaw).toUpperCase().trim();
+  const ptAb = USFM_TO_PT_ABBREV[k];
+  return ptAb ? PT_ABBREV_TO_BOOK_NAME[ptAb] : null;
+}
 
 const VOTD_REFERENCES = [
   'João 3:16',
@@ -674,7 +694,12 @@ async function ensureBooksIndex() {
       }
       booksById = map;
     } catch (e) {
-      logFailure('ensureBooksIndex /statics indisponível — mantendo mapa local de livros', e);
+      // Esperado quando a API está lenta, bloqueada ou sem rota — leitura já usa mapa local em memória.
+      const dbg = process.env.BIBLE_DEBUG === '1' || process.env.BIBLE_DEBUG === 'true';
+      if (dbg) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn('[bibleService] /statics (opcional) falhou — mapa local mantido:', msg);
+      }
     }
   })();
 }
@@ -760,13 +785,19 @@ function rowsForModule(data, module) {
  * Formato legado consumido pelo React (Evita breaking change: `number` = nº do versículo).
  */
 function toLegacyVerse(row, booksMap, versionQuery) {
-  const meta = booksMap.get(String(row.book));
-  const bookName = meta ? meta.name : `Book ${row.book}`;
-  const short = meta ? meta.shortname : String(row.book);
+  const id = String(row.book);
+  const meta = booksMap.get(id);
+  const idx = Number(row.book);
+  const ptName =
+    (idx >= 1 && idx <= 66 ? BOOK_ID_TO_PT_DISPLAY[id] : null) ||
+    (meta ? meta.name : null) ||
+    `Livro ${row.book}`;
+  const ptAbbrev = idx >= 1 && idx <= 66 ? CANON_ABBREVS_IN_ORDER[idx - 1] : null;
+  const enShort = meta ? meta.shortname : ptAbbrev || id;
   return {
     book: {
-      name: bookName,
-      abbrev: { pt: short, en: short },
+      name: ptName,
+      abbrev: { pt: ptAbbrev || enShort, en: enShort },
       version: String(versionQuery).toLowerCase(),
     },
     chapter: row.chapter,
@@ -805,10 +836,12 @@ async function fallbackSingleVerse(version, book, chapter, verse) {
     throw new Error(data.error || 'Fallback bible-api.com sem dados');
   }
   const first = data.verses[0];
+  const ptAb = USFM_TO_PT_ABBREV[String(first.book_id || '').toUpperCase().trim()];
+  const ptName = bookDisplayNamePtFromUsfmId(first.book_id) || first.book_name;
   return {
     book: {
-      name: first.book_name,
-      abbrev: { pt: null, en: first.book_id },
+      name: ptName,
+      abbrev: { pt: ptAb || null, en: first.book_id },
       version: String(version).toLowerCase(),
     },
     chapter: first.chapter,
@@ -850,19 +883,23 @@ async function fallbackVersesByChapter(version, book, chapter) {
     translation_name: data.translation_name,
     note: 'Bible SuperSearch indisponível ou lenta; capítulo via bible-api.com (domínio público).',
   };
-  const verses = data.verses.map((v) => ({
-    book: {
-      name: v.book_name,
-      abbrev: { pt: null, en: v.book_id },
-      version: String(version).toLowerCase(),
-    },
-    chapter: v.chapter,
-    number: v.verse,
-    text: String(v.text || '')
-      .replace(/\s+/g, ' ')
-      .trim(),
-    _meta: meta,
-  }));
+  const verses = data.verses.map((v) => {
+    const ptAb = USFM_TO_PT_ABBREV[String(v.book_id || '').toUpperCase().trim()];
+    const ptName = bookDisplayNamePtFromUsfmId(v.book_id) || v.book_name;
+    return {
+      book: {
+        name: ptName,
+        abbrev: { pt: ptAb || null, en: v.book_id },
+        version: String(version).toLowerCase(),
+      },
+      chapter: v.chapter,
+      number: v.verse,
+      text: String(v.text || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      _meta: meta,
+    };
+  });
   return {
     version: String(version).toLowerCase(),
     chapter: ch,
