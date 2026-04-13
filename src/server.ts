@@ -27,6 +27,9 @@ import seedAdmin from './seed';
 
 const app = express();
 
+// Necessário atrás de proxy reverso (Hostinger, Nginx, etc.) para CORS/IP e rate-limit corretos
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
+
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map(origin => origin.trim())
