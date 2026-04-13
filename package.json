@@ -4,11 +4,11 @@
   "description": "",
   "main": "src/server.ts",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node build/server.js",
     "dev": "tsx watch src/server.ts",
     "start:dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start:prod": "node dist/server.js"
+    "start:prod": "node build/server.js"
   },
   "keywords": [],
   "author": "",
